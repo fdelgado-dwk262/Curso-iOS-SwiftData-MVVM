@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct Curso_iOS_SwiftDataApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            VistaTareas()
         }
+        .modelContainer(for: Tarea.self)
     }
 }
