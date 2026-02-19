@@ -104,7 +104,7 @@ struct ContentView: View {
                 .tabItem {
                     Label("Cursos", systemImage: "book")
                 }
-            Text("VistaMatriculas()")
+            VistaMatriculas()
                 .tabItem {
                     Label("Matrículas", systemImage: "list.bullet.clipboard")
                 }
@@ -121,7 +121,7 @@ struct VistaEstudiantes: View {
         NavigationStack {
             List {
                 ForEach(estudiantes) { estudiante in
-                    NavigationLink(destination: Text("VistaDetalleEstudiante")) {
+                    NavigationLink(destination: VistaDetalleEstudiante(estudiante: estudiante)) {
                         VStack(alignment: .leading) {
                             Text(estudiante.nombre)
                                 .font(.headline)
@@ -147,11 +147,149 @@ struct VistaEstudiantes: View {
                 }
             }
             .sheet(isPresented: $mostrarNuevoEstudiante) {
-                Text("VistaNuevoEstudiante")
+                VistaNuevoEstudiante()
             }
         }
     }
 }
+
+struct VistaNuevoEstudiante: View {
+    var body: some View {
+        
+    }
+}
+
+struct VistaDetalleEstudiante: View {
+    let estudiante: Estudiante
+    @Environment(\.modelContext) private var context
+    @State private var mostrarMatricular = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Datos del estudiante
+            VStack(alignment: .leading, spacing: 10) {
+                Text(estudiante.nombre)
+                    .font(.title)
+                Text(estudiante.email)
+                    .foregroundStyle(.secondary)
+                Text("Nacimiento: \(estudiante.fechaNacimiento, style: .date)")
+                    .font(.caption)
+            }
+            .padding()
+            
+            List {
+                Section("Cursos matriculados") {
+                    if let matriculas = estudiante.matriculas,
+                       !matriculas.isEmpty {
+                        ForEach(matriculas) { matricula in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(matricula.curso?.nombre ?? "Sin curso")
+                                        .font(.headline)
+                                    Text("Semestre: \(matricula.semestre)")
+                                        .font(.caption)
+                                    if let calificacion = matricula.calificacion {
+                                        Text("Calificación: \(calificacion, specifier: "%.2f")")
+                                            .font(.caption)
+                                            .foregroundStyle(calificacion >= 5.0 ? .green : .red)
+                                    }
+                                }
+                                Spacer()
+                                Button("Eliminar") {
+                                    context.delete(matricula)
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.red)
+                            }
+                        }
+                        
+                    } else {
+                        Text("No tiene cursos matriculados")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+        }
+        .navigationTitle("Detalle Estudiante")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Matricular en curso") {
+                    mostrarMatricular = true
+                }
+            }
+        }
+        .sheet(isPresented: $mostrarMatricular) {
+            VistaMatricularEstudiante(estudiante: estudiante)
+        }
+    }
+}
+
+struct VistaMatricularEstudiante: View {
+    let estudiante: Estudiante
+    
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    
+    @Query private var cursos: [Curso]
+    
+    // Necesitamos los cursos en los que no está matriculado
+    var cursosNoMatriculados: [Curso] {
+        let cursosMatriculados = estudiante.cursos
+        return cursos.filter { !cursosMatriculados.contains($0) }
+    }
+    
+    @State private var cursoSeleccionado: Curso?
+    @State private var semestre = "2026-1"
+    @State private var calificacion: Double?
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("Curso", selection: $cursoSeleccionado) {
+                    Text("Seleccionar curso")
+                        .tag(nil as Curso?)
+                    ForEach(cursosNoMatriculados) { curso in
+                        Text("\(curso.codigo) - \(curso.nombre)")
+                            .tag(curso as Curso?)
+                    }
+                }
+                
+                TextField("Semestre", text: $semestre)
+                
+                TextField("Calificación (opcional)", value: $calificacion, format: .number)
+                    .keyboardType(.decimalPad)
+                
+                Section {
+                    Button("Matricular") {
+                        guard let curso = cursoSeleccionado else { return }
+                        
+                        let matricula = Matricula(
+                            estudiante: estudiante,
+                            curso: curso,
+                            semestre: semestre,
+                            calificacion: calificacion
+                        )
+                        
+                        context.insert(matricula)
+                        dismiss()
+                    }
+                    .disabled(cursoSeleccionado == nil || semestre.isEmpty)
+                }
+                
+            }
+            .navigationTitle("Nueva matrícula")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+
 
 struct VistaCursos: View {
     @Query private var cursos: [Curso]
@@ -160,13 +298,55 @@ struct VistaCursos: View {
     var body: some View {
         NavigationStack {
             List {
-                
+                ForEach(cursos) { curso in
+                    VStack(alignment: .leading) {
+                        Text(curso.nombre)
+                            .font(.headline)
+                        Text("Código: \(curso.codigo)")
+                            .font(.caption)
+                        Text("Profesor: \(curso.profesor)")
+                            .font(.caption)
+                        Text("Estudiantes: \(curso.estudiantes.count)")
+                            .font(.caption)
+                    }
+                }
             }
             
             .navigationTitle("Cursos")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Agregar") {
+                        mostrarNuevoCurso = true
+                    }
+                }
+            }
+            .sheet(isPresented: $mostrarNuevoCurso) {
+                Text("VistaNuevoCurso()")
+            }
         }
     }
+}
+
+struct VistaMatriculas: View {
+    @Query(sort: \Matricula.fechaMatricula, order: .reverse)
+    private var matriculas: [Matricula]
     
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Todas las matrículas") {
+                    ForEach(matriculas) { matricula in
+                        VStack(alignment: .leading) {
+                            Text("\(matricula.estudiante?.nombre ?? "N/A") - \(matricula.curso?.nombre ?? "N/A")")
+                            Text("Semestre: \(matricula.semestre)")
+                        }
+                    }
+                }
+            }
+            
+            .navigationTitle("Matrículas")
+        }
+    }
 }
 
 #Preview {
