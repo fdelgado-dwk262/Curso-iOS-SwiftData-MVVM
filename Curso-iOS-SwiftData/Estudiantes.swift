@@ -154,8 +154,45 @@ struct VistaEstudiantes: View {
 }
 
 struct VistaNuevoEstudiante: View {
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var nombre = ""
+    @State private var email = ""
+    @State private var fechaNacimiento = Date()
+
     var body: some View {
-        
+        NavigationStack {
+            Form {
+                TextField("Nombre", text: $nombre)
+                
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                
+                DatePicker("Fecha de nacimiento",
+                        selection: $fechaNacimiento,
+                        displayedComponents: .date)
+            }
+            .navigationTitle("Nuevo estudiante")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Guardar") {
+                        let estudiante = Estudiante(
+                            nombre: nombre,
+                            email: email,
+                            fechaNacimiento: fechaNacimiento
+                        )
+                        context.insert(estudiante)
+                        dismiss()
+                    }
+                    .disabled(nombre.isEmpty || email.isEmpty)
+                }
+            }
+        }
     }
 }
 
@@ -321,15 +358,66 @@ struct VistaCursos: View {
                 }
             }
             .sheet(isPresented: $mostrarNuevoCurso) {
-                Text("VistaNuevoCurso()")
+                VistaNuevoCurso()
             }
         }
     }
 }
 
+struct VistaNuevoCurso: View {
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var codigo = ""
+    @State private var nombre = ""
+    @State private var creditos = 3
+    @State private var profesor = ""
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Código", text: $codigo)
+                TextField("Nombre", text: $nombre)
+                Stepper("Créditos: \(creditos)", value: $creditos, in: 1...10)
+                TextField("Profesor", text: $profesor)
+            }
+            .navigationTitle("Nuevo curso")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Guardar") {
+                        let curso = Curso(
+                            codigo: codigo,
+                            nombre: nombre,
+                            creditos: creditos,
+                            profesor: profesor
+                        )
+                        context.insert(curso)
+                        dismiss()
+                    }
+                    .disabled(codigo.isEmpty || nombre.isEmpty || profesor.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+
 struct VistaMatriculas: View {
     @Query(sort: \Matricula.fechaMatricula, order: .reverse)
     private var matriculas: [Matricula]
+    
+    @Query(filter: #Predicate<Matricula> {
+        ($0.calificacion ?? 0.0) >= 5.0
+    })
+    private var matriculasAprobadas: [Matricula]
+    
+    @Query(filter: #Predicate<Matricula> {
+        $0.estudiante?.nombre.contains("Ana") == true
+    })
+    private var matriculasDeAna: [Matricula]
     
     var body: some View {
         NavigationStack {
@@ -340,6 +428,12 @@ struct VistaMatriculas: View {
                             Text("\(matricula.estudiante?.nombre ?? "N/A") - \(matricula.curso?.nombre ?? "N/A")")
                             Text("Semestre: \(matricula.semestre)")
                         }
+                    }
+                }
+                
+                Section("Matrículas aprobadas") {
+                    ForEach(matriculasAprobadas) { matricula in
+                        Text("\(matricula.estudiante?.nombre ?? "N/A") - \(matricula.calificacion ?? 0.0, specifier: "%.2f")")
                     }
                 }
             }
