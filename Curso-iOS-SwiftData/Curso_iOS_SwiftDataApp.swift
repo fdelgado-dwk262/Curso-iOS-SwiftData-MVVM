@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Observation
 
 @main
 struct Curso_iOS_SwiftDataApp: App {
