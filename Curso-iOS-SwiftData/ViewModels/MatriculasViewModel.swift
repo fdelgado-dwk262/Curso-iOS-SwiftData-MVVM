@@ -4,6 +4,10 @@
 //
 //  Created by Equipo 9 on 20/2/26.
 //
+// 👀 -------------------------
+// al estar fuera de la vista necesitamos el descroptor
+// para poder acceder a la base de datos
+// ----------------------------
 
 import SwiftData
 import SwiftUI
@@ -41,9 +45,25 @@ class MatriculasViewModel {
             )
             matriculasAprobadas = try context.fetch(descriptorAprovadas)
             
+            if let nombreABuscar = nombreAlumno {
+                let filtroAlumno = #Predicate<Matricula> { matricula in
+                    matricula.estudiante?.nombre.contains(nombreABuscar) == true
+                }
+                let descriptorAlumnos = FetchDescriptor<Matricula>(predicate: filtroAlumno)
+                matriculasDeAlumno = try context.fetch(descriptorAlumnos)
+            }
+            
+            
         } catch {
             print("Error cargando Datos \(error)")
         }
+    }
+    
+    func eliminarMatricula(matricula: Matricula) {
+        context.delete(matricula)
+        // hay que recargar los arrays para que la UI se entere de los cambios y el borrado
+        // al no tener el Query que hemos borrado en el refactor
+        cargarDatos()
 
     }
 
